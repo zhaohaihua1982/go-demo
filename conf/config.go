@@ -9,14 +9,37 @@ import (
 var Config *Conf
 
 type Conf = struct {
-	Email *Email `yaml:"email"`
+	MySql map[string]*MySql `yaml:"mysql"`
+	Redis *Redis            `yaml:"redis"`
+	Oss   *Oss              `yaml:"oss"`
 }
 
-type Email struct {
-	Address   string `yaml:"address"`
-	SmtpHost  string `yaml:"smtpHost"`
-	SmtpEmail string `yaml:"smtpEmail"`
-	SmtpPass  string `yaml:"smtpPass"`
+type Oss struct {
+	BucketName      string `yaml:"bucketName"`
+	AccessKeyId     string `yaml:"accessKeyId"`
+	AccessKeySecret string `yaml:"accessKeySecret"`
+	Endpoint        string `yaml:"endPoint"`
+	EndpointOut     string `yaml:"endpointOut"`
+	QiNiuServer     string `yaml:"qiNiuServer"`
+}
+
+type MySql struct {
+	Dialect  string `yaml:"dialect"`
+	DbHost   string `yaml:"dbHost"`
+	DbPort   string `yaml:"dbPort"`
+	DbName   string `yaml:"dbName"`
+	UserName string `yaml:"userName"`
+	Password string `yaml:"password"`
+	Charset  string `yaml:"charset"`
+}
+
+type Redis struct {
+	RedisHost     string `yaml:"redisHost"`
+	RedisPort     string `yaml:"redisPort"`
+	RedisUsername string `yaml:"redisUsername"`
+	RedisPassword string `yaml:"redisPwd"`
+	RedisDbName   int    `yaml:"redisDbName"`
+	RedisNetwork  string `yaml:"redisNetwork"`
 }
 
 func InitConfig() {

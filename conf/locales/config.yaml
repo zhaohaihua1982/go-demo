@@ -1,5 +1,22 @@
-email:
-  address: http://localhost:8080/#/vaild/email/
-  smtpHost: 192.168.7.101
-  smtpEmail: mail@163.com
-  smtpPass: zhh666
+mysql:
+  default:
+    dialect: "mysql"
+    dbHost: "127.0.0.1"
+    dbPort: "3306"
+    dbName: "mall_db"
+    userName: "root"
+    password: "zhh2026"
+    charset: "utf8mb4"
+
+oss:
+  accessKeyId:
+  accessKeySecret:
+  bucketName:
+  qiNiuServer:
+
+redis:
+  redisDbName: 4
+  redisHost: 127.0.0.1
+  redisPort: 6379
+  redisNetwork: "tcp"
+  redisPwd: ""
