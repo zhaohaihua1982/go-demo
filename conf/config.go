@@ -1,62 +1,100 @@
 package conf
 
 import (
-	"os"
+	"bytes"
+	_ "embed"
+	"errors"
+	"fmt"
 
 	"github.com/spf13/viper"
 )
 
+//go:embed locales/config.yaml
+var configYAML []byte
+
 var Config *Conf
 
-type Conf = struct {
-	MySql map[string]*MySql `yaml:"mysql"`
-	Redis *Redis            `yaml:"redis"`
-	Oss   *Oss              `yaml:"oss"`
+type Conf struct {
+	MySql map[string]*MySql `mapstructure:"mysql"`
+	Redis *Redis            `mapstructure:"redis"`
+	Oss   *Oss              `mapstructure:"oss"`
 }
 
 type Oss struct {
-	BucketName      string `yaml:"bucketName"`
-	AccessKeyId     string `yaml:"accessKeyId"`
-	AccessKeySecret string `yaml:"accessKeySecret"`
-	Endpoint        string `yaml:"endPoint"`
-	EndpointOut     string `yaml:"endpointOut"`
-	QiNiuServer     string `yaml:"qiNiuServer"`
+	BucketName      string `mapstructure:"bucketName"`
+	AccessKeyId     string `mapstructure:"accessKeyId"`
+	AccessKeySecret string `mapstructure:"accessKeySecret"`
+	Endpoint        string `mapstructure:"endPoint"`
+	EndpointOut     string `mapstructure:"endpointOut"`
+	QiNiuServer     string `mapstructure:"qiNiuServer"`
 }
 
 type MySql struct {
-	Dialect  string `yaml:"dialect"`
-	DbHost   string `yaml:"dbHost"`
-	DbPort   string `yaml:"dbPort"`
-	DbName   string `yaml:"dbName"`
-	UserName string `yaml:"userName"`
-	Password string `yaml:"password"`
-	Charset  string `yaml:"charset"`
+	Dialect  string `mapstructure:"dialect"`
+	DbHost   string `mapstructure:"dbHost"`
+	DbPort   string `mapstructure:"dbPort"`
+	DbName   string `mapstructure:"dbName"`
+	UserName string `mapstructure:"userName"`
+	Password string `mapstructure:"password"`
+	Charset  string `mapstructure:"charset"`
 }
 
 type Redis struct {
-	RedisHost     string `yaml:"redisHost"`
-	RedisPort     string `yaml:"redisPort"`
-	RedisUsername string `yaml:"redisUsername"`
-	RedisPassword string `yaml:"redisPwd"`
-	RedisDbName   int    `yaml:"redisDbName"`
-	RedisNetwork  string `yaml:"redisNetwork"`
+	RedisHost     string `mapstructure:"redisHost"`
+	RedisPort     string `mapstructure:"redisPort"`
+	RedisUsername string `mapstructure:"redisUsername"`
+	RedisPassword string `mapstructure:"redisPwd"`
+	RedisDbName   int    `mapstructure:"redisDbName"`
+	RedisNetwork  string `mapstructure:"redisNetwork"`
 }
 
-func InitConfig() {
-	workDir, _ := os.Getwd()
+// InitConfig 从编译期内嵌的 yaml 加载配置，不依赖进程工作目录。
+func InitConfig() error {
 	viper.SetConfigType("yaml")
-	viper.SetConfigName("config")
-	viper.AddConfigPath(workDir + "/conf/locales")
-	viper.SetConfigFile(workDir + "/conf/locales/config.yaml")
-	_err := viper.ReadInConfig()
-	if _err != nil {
-		panic(_err)
+	if err := viper.ReadConfig(bytes.NewReader(configYAML)); err != nil {
+		return fmt.Errorf("读取配置失败: %w", err)
 	}
 
-	// 把 yaml 内容反序列化到 Config，否则 Config 永远是 nil
-	if err := viper.Unmarshal(&Config); err != nil {
-		panic(err)
+	var c Conf
+	if err := viper.Unmarshal(&c); err != nil {
+		return fmt.Errorf("解析配置失败: %w", err)
 	}
+	Config = &c
+
+	return Config.Validate()
+}
+
+// Validate 校验必填项，避免启动后拿到空地址再报 nil/连接错误。
+func (c *Conf) Validate() error {
+	var errs []error
+
+	my := c.MySql["default"]
+	if my == nil {
+		errs = append(errs, errors.New("mysql.default 未配置"))
+	} else {
+		if my.DbHost == "" {
+			errs = append(errs, errors.New("mysql.default.dbHost 不能为空"))
+		}
+		if my.DbPort == "" {
+			errs = append(errs, errors.New("mysql.default.dbPort 不能为空"))
+		}
+		if my.DbName == "" {
+			errs = append(errs, errors.New("mysql.default.dbName 不能为空"))
+		}
+	}
+
+	if c.Redis == nil {
+		errs = append(errs, errors.New("redis 未配置"))
+	} else {
+		if c.Redis.RedisHost == "" {
+			errs = append(errs, errors.New("redis.redisHost 不能为空"))
+		}
+		if c.Redis.RedisPort == "" {
+			errs = append(errs, errors.New("redis.redisPort 不能为空"))
+		}
+	}
+
+	return errors.Join(errs...)
 }
 
 // GetString 供外部直接读取 viper 中的配置项

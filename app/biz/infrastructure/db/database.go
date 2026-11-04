@@ -1,72 +1,89 @@
-package dao
+package db
 
 import (
 	"context"
-	"strings"
+	"fmt"
 	"time"
 
-	"github.com/gin-gonic/gin"
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
-	"gorm.io/plugin/dbresolver"
 
 	"demo/conf"
 )
 
-var (
-	_db *gorm.DB
-)
-
-func InitMySQL() {
-	mConfig := conf.Config.MySql["default"]
-	pathRead := strings.Join([]string{mConfig.UserName, ":", mConfig.Password, "@tcp(", mConfig.DbHost, ":", mConfig.DbPort, ")/", mConfig.DbName, "?charset=" + mConfig.Charset + "&parseTime=true"}, "")
-	pathWrite := strings.Join([]string{mConfig.UserName, ":", mConfig.Password, "@tcp(", mConfig.DbHost, ":", mConfig.DbPort, ")/", mConfig.DbName, "?charset=" + mConfig.Charset + "&parseTime=true"}, "")
-
-	var ormLogger logger.Interface
-	if gin.Mode() == "debug" {
-		ormLogger = logger.Default.LogMode(logger.Info)
-	} else {
-		ormLogger = logger.Default
+// InitMySQL 建立 MySQL 连接池并做启动探活。
+// debug 为 true 时打印 SQL；调用方负责在退出时调用 Close 释放连接。
+func InitMySQL(cfg *conf.MySql, debug bool) (*gorm.DB, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("mysql 配置为空")
 	}
-	db, err := gorm.Open(mysql.New(mysql.Config{
-		DSN:                       pathRead, // DSN data source name
-		DefaultStringSize:         256,      // string 类型字段的默认长度
-		DisableDatetimePrecision:  true,     // 禁用 datetime 精度，MySQL 5.6 之前的数据库不支持
-		DontSupportRenameIndex:    true,     // 重命名索引时采用删除并新建的方式，MySQL 5.7 之前的数据库和 MariaDB 不支持重命名索引
-		DontSupportRenameColumn:   true,     // 用 `change` 重命名列，MySQL 8 之前的数据库和 MariaDB 不支持重命名列
-		SkipInitializeWithVersion: false,    // 根据版本自动配置
+
+	// 用驱动自带的 Config 拼 DSN，密码里的 @ / : 等字符会被正确转义
+	dsn := mysqldriver.NewConfig()
+	dsn.User = cfg.UserName
+	dsn.Passwd = cfg.Password
+	dsn.Net = "tcp"
+	dsn.Addr = cfg.DbHost + ":" + cfg.DbPort
+	dsn.DBName = cfg.DbName
+	dsn.ParseTime = true
+	dsn.Timeout = 3 * time.Second
+	dsn.ReadTimeout = 10 * time.Second
+	dsn.WriteTimeout = 10 * time.Second
+	dsn.Params = map[string]string{"charset": cfg.Charset}
+
+	logLevel := logger.Warn
+	if debug {
+		logLevel = logger.Info
+	}
+
+	gormDB, err := gorm.Open(mysql.New(mysql.Config{
+		DSNConfig:                 dsn,
+		DefaultStringSize:         256,
+		DisableDatetimePrecision:  true, // MySQL 5.6 之前的数据库不支持 datetime 精度
+		DontSupportRenameIndex:    true, // 重命名索引时采用删除并新建的方式
+		DontSupportRenameColumn:   true, // 用 `change` 重命名列
+		SkipInitializeWithVersion: false,
 	}), &gorm.Config{
-		Logger: ormLogger,
+		Logger: logger.Default.LogMode(logLevel),
 		NamingStrategy: schema.NamingStrategy{
 			SingularTable: true,
 		},
 	})
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("连接 mysql 失败: %w", err)
 	}
-	sqlDB, _ := db.DB()
-	sqlDB.SetMaxIdleConns(20)  // 设置连接池，空闲
-	sqlDB.SetMaxOpenConns(100) // 打开
-	sqlDB.SetConnMaxLifetime(time.Second * 30)
-	_db = db
-	_ = _db.Use(dbresolver.
-		Register(dbresolver.Config{
-			// `db2` 作为 sources，`db3`、`db4` 作为 replicas
-			Sources:  []gorm.Dialector{mysql.Open(pathRead)},                         // 写操作
-			Replicas: []gorm.Dialector{mysql.Open(pathWrite), mysql.Open(pathWrite)}, // 读操作
-			Policy:   dbresolver.RandomPolicy{},                                      // sources/replicas 负载均衡策略
-		}))
 
-	_db = _db.Set("gorm:table_options", "charset=utf8mb4")
-	//err = migrate()
-	//if err != nil {
-	//	panic(err)
-	//}
+	sqlDB, err := gormDB.DB()
+	if err != nil {
+		return nil, fmt.Errorf("获取 mysql 连接池失败: %w", err)
+	}
+
+	sqlDB.SetMaxIdleConns(20)
+	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute) // 需小于 MySQL wait_timeout
+	sqlDB.SetConnMaxIdleTime(10 * time.Minute)
+
+	pingCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := sqlDB.PingContext(pingCtx); err != nil {
+		_ = sqlDB.Close()
+		return nil, fmt.Errorf("mysql 探活失败: %w", err)
+	}
+
+	return gormDB.Set("gorm:table_options", "charset=utf8mb4"), nil
 }
 
-func NewDBClient(ctx context.Context) *gorm.DB {
-	db := _db
-	return db.WithContext(ctx)
+// Close 释放 MySQL 连接池。
+func Close(gormDB *gorm.DB) error {
+	if gormDB == nil {
+		return nil
+	}
+	sqlDB, err := gormDB.DB()
+	if err != nil {
+		return fmt.Errorf("获取 mysql 连接池失败: %w", err)
+	}
+	return sqlDB.Close()
 }
