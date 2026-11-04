@@ -1,0 +1,5 @@
+email:
+  address: http://localhost:8080/#/vaild/email/
+  smtpHost: 192.168.7.101
+  smtpEmail: mail@163.com
+  smtpPass: zhh666
