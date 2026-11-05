@@ -1,0 +1,45 @@
+{
+  "200": "ok",
+  "201": "password changed successfully",
+  "202": "this third-party account is not bound",
+  "400": "invalid request parameters",
+  "500": "fail",
+
+  "10001": "nickname already exists",
+  "10002": "username already exists",
+  "10003": "user does not exist",
+  "10004": "incorrect username or password",
+  "10005": "the two passwords do not match",
+  "10006": "encryption failed",
+  "10007": "product does not exist",
+  "10008": "shipping address does not exist",
+  "10009": "product already in favorites",
+  "10010": "user does not exist",
+
+  "20001": "boss token verification failed",
+  "20002": "boss token has expired",
+  "20003": "failed to generate boss token",
+  "20004": "invalid boss token",
+  "20005": "insufficient boss privileges",
+  "20006": "boss failed to read file",
+  "20007": "product already in cart, quantity increased",
+  "20008": "quantity exceeds the upper limit",
+
+  "30001": "token verification failed",
+  "30002": "token has expired",
+  "30003": "failed to generate token",
+  "30004": "invalid token",
+  "30005": "insufficient privileges",
+  "30006": "failed to read file",
+  "30007": "failed to send email",
+  "30008": "failed to call upstream API",
+  "30009": "failed to decode JSON",
+  "30010": "admin failed to query user",
+  "30011": "admin username already exists",
+  "30012": "admin does not exist",
+
+  "40001": "database error, please retry",
+
+  "50001": "invalid OSS configuration",
+  "50002": "upload failed"
+}

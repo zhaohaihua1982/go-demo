@@ -7,6 +7,9 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
+	"log"
+
+	"demo/pkg/i18n"
 
 	"demo/app/biz/infrastructure/cache"
 	"demo/app/biz/infrastructure/db"
@@ -28,6 +31,15 @@ func Init(ctx context.Context, debug bool) (*App, error) {
 	}
 
 	app := &App{Conf: conf.Config}
+
+	// 默认语言：yaml 显式配置优先于 DEMO_LANG 环境变量
+	if app.Conf.I18n != nil && app.Conf.I18n.DefaultLang != "" {
+		if lang, ok := i18n.ParseLang(app.Conf.I18n.DefaultLang); ok {
+			i18n.SetDefaultLang(lang)
+		} else {
+			log.Printf("配置 i18n.defaultLang=%q 不是已注册语言，回退默认链", app.Conf.I18n.DefaultLang)
+		}
+	}
 
 	gormDB, err := db.InitMySQL(app.Conf.MySql["default"], debug)
 	if err != nil {

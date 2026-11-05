@@ -14,6 +14,10 @@ oss:
   bucketName:
   qiNiuServer:
 
+# 国际化：defaultLang 未设置或未注册时回退 zh-CN（也可用 DEMO_LANG 环境变量）
+i18n:
+  defaultLang: "zh-CN"
+
 redis:
   redisDbName: 4
   redisHost: 127.0.0.1

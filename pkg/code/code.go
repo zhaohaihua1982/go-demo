@@ -42,6 +42,8 @@ const (
 	ErrorCallApi                   = 30008
 	ErrorUnmarshalJson             = 30009
 	ErrorAdminFindUser             = 30010
+	ErrorAdminNameTaken            = 30011 //管理员用户名已存在（admin.user_name 唯一索引）
+	ErrorAdminNotFound             = 30012 //管理员不存在
 	//数据库错误
 	ErrorDatabase = 40001
 

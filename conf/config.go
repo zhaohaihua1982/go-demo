@@ -21,6 +21,13 @@ type Conf struct {
 	MySql map[string]*MySql `mapstructure:"mysql"`
 	Redis *Redis            `mapstructure:"redis"`
 	Oss   *Oss              `mapstructure:"oss"`
+	I18n  *I18n             `mapstructure:"i18n"`
+}
+
+// I18n 国际化配置：切换默认语言只改 defaultLang。
+type I18n struct {
+	// DefaultLang 默认语言标签（如 zh-CN / en-US），必须命中 pkg/i18n 已注册语言。
+	DefaultLang string `mapstructure:"defaultLang"`
 }
 
 type Oss struct {
