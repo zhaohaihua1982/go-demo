@@ -16,9 +16,11 @@ import (
 
 // InitMySQL 建立 MySQL 连接池并做启动探活。
 // debug 为 true 时打印 SQL；调用方负责在退出时调用 Close 释放连接。
-// 返回的是 GORM 根连接：DAO/业务代码使用时请先 WithContext/Session 获取
-// 会话再链式调用，禁止在根连接上直接 Unscoped/Set 等可变更操作，否则
-// 会污染全局语义（典型表现：本该硬删的 Unscoped.Delete 变成软删）。
+//
+// 注意：返回的是 GORM 根连接，任何派生调用（WithContext/Session）都会
+// 创建新会话实例。建议所有使用处先 WithContext 取会话（本包目的之一是把
+// 调用方 context 传给驱动，实现超时/取消传播）；直接在根连接上链式调用
+// 拿不到 ctx 传播。
 func InitMySQL(cfg *conf.MySql, debug bool) (*gorm.DB, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("mysql 配置为空")
