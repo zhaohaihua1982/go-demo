@@ -1,11 +1,13 @@
 package application_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
 	"demo/app/biz/application"
 	admin "demo/app/biz/domain/admin"
+	"demo/app/biz/domain/errs"
 	"demo/pkg/i18n"
 )
 
@@ -102,6 +104,55 @@ func TestMessageWithWrappedError(t *testing.T) {
 	wrapped := fmt.Errorf("处理 admin 失败: %w", admin.ErrNotFound)
 	if got := application.Message(wrapped, i18n.LangZH); got != "管理员不存在" {
 		t.Errorf("包裹错误应映射到 30012 文案, got %q", got)
+	}
+}
+
+// TestErrMapperRegistry 锁定分发器机制：领域注册生效、全未命中回退
+// ERROR、注册期封闭——这些语义不随后续业务扩充而改变。
+func TestErrMapperRegistry(t *testing.T) {
+	// admin 映射已注册，领域错误必须命中
+	if got := application.CodeOf(admin.ErrUserNameTaken); got != 30011 {
+		t.Errorf("admin.ErrUserNameTaken 应映射 30011, got %d", got)
+	}
+
+	// 运行期注册是误用：封闭后必须 panic，而不是静默丢映射
+	application.CodeOf(errors.New("insurance")) // 确保已处于封装期
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("首次查询后调 RegisterErrMapper 应 panic")
+		} else {
+			t.Logf("封闭后注册被拦截: %v", r)
+		}
+	}()
+	application.RegisterErrMapper(func(err error) (int, bool) { return 0, false })
+}
+
+// TestStorageErrorMapping 锁定"存储层错误 → 40001 多语言文案"链路。
+// DAO 返回的底层错误（gorm/驱动等）经 errs.WrapStorage 打标后：
+//   - CodeOf 命中 ErrorDatabase（40001），不再落到 default("fail")
+//   - errors.Is(err, errs.ErrStorage) 成立
+//   - 错误链不影响领域业务错误的甄别（先领域后分层）
+func TestStorageErrorMapping(t *testing.T) {
+	inner := errors.New("connection reset by peer") // 模拟 gorm/驱动错误
+	wrapped := errs.WrapStorage("admin.create", inner)
+
+	if got := application.CodeOf(wrapped); got != 40001 {
+		t.Errorf("存储层错误应映射 40001, got %d", got)
+	}
+	for _, lang := range i18n.Languages() {
+		msg := application.Message(wrapped, lang)
+		if msg == "" || msg == "fail" {
+			t.Errorf("存储层错误在 %s 下的文案缺失: %q", lang, msg)
+		}
+		t.Logf("存储层错误 [%s] → 40001 msg=%q", lang, msg)
+	}
+	// 链上底层错误仍可甄别，不因打标丢失
+	if !errors.Is(wrapped, inner) {
+		t.Error("WrapStorage 不应断开底层错误链")
+	}
+	// 包装语义：日志可见 op 与原因
+	if got := wrapped.Error(); got != "admin.create: connection reset by peer" {
+		t.Errorf("StorageError 文案意外: %q", got)
 	}
 }
 

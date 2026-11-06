@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	admin "demo/app/biz/domain/admin"
+	"demo/app/biz/domain/errs"
 )
 
 // AdminPO admin 表的数据对象，字段与表结构一一对应。
@@ -77,7 +78,7 @@ var _ admin.Repository = (*AdminDAO)(nil)
 func (d *AdminDAO) Create(ctx context.Context, a *admin.Admin) (int64, error) {
 	existing, err := d.GetByUserName(ctx, a.UserName)
 	if err != nil {
-		return 0, err
+		return 0, err // GetByUserName 内部已打存储层标记
 	}
 	if existing != nil {
 		return 0, admin.ErrUserNameTaken
@@ -89,7 +90,7 @@ func (d *AdminDAO) Create(ctx context.Context, a *admin.Admin) (int64, error) {
 		if isDuplicateKey(err) {
 			return 0, admin.ErrUserNameTaken
 		}
-		return 0, err
+		return 0, errs.WrapStorage("admin.create", err)
 	}
 	a.ID = po.ID
 	a.CreatedAt = po.CreatedAt
@@ -111,7 +112,7 @@ func (d *AdminDAO) GetByID(ctx context.Context, id int64) (*admin.Admin, error) 
 		return nil, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, errs.WrapStorage("admin.get_by_id", err)
 	}
 	return po.toDomain(), nil
 }
@@ -124,7 +125,7 @@ func (d *AdminDAO) GetByUserName(ctx context.Context, userName string) (*admin.A
 		return nil, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, errs.WrapStorage("admin.get_by_username", err)
 	}
 	return po.toDomain(), nil
 }
@@ -147,7 +148,7 @@ func (d *AdminDAO) Update(ctx context.Context, a *admin.Admin) error {
 		if isDuplicateKey(res.Error) {
 			return admin.ErrUserNameTaken
 		}
-		return res.Error
+		return errs.WrapStorage("admin.update", res.Error)
 	}
 	if res.RowsAffected == 0 {
 		return admin.ErrNotFound
@@ -159,7 +160,7 @@ func (d *AdminDAO) Update(ctx context.Context, a *admin.Admin) error {
 func (d *AdminDAO) Delete(ctx context.Context, id int64) error {
 	res := d.db.WithContext(ctx).Delete(&AdminPO{}, "id = ?", id)
 	if res.Error != nil {
-		return res.Error
+		return errs.WrapStorage("admin.delete", res.Error)
 	}
 	if res.RowsAffected == 0 {
 		return admin.ErrNotFound
@@ -178,7 +179,7 @@ func (d *AdminDAO) List(ctx context.Context, q admin.ListQuery) (*admin.ListResu
 
 	var total int64
 	if err := cond.Count(&total).Error; err != nil {
-		return nil, err
+		return nil, errs.WrapStorage("admin.list.count", err)
 	}
 
 	var pos []AdminPO
@@ -187,7 +188,7 @@ func (d *AdminDAO) List(ctx context.Context, q admin.ListQuery) (*admin.ListResu
 		Limit(q.PageSize).
 		Offset(q.Offset()).
 		Find(&pos).Error; err != nil {
-		return nil, err
+		return nil, errs.WrapStorage("admin.list.find", err)
 	}
 
 	items := make([]admin.Admin, 0, len(pos))
