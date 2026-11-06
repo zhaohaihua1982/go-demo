@@ -1,5 +1,26 @@
-email:
-  address: http://localhost:8080/#/vaild/email/
-  smtpHost: 192.168.7.101
-  smtpEmail: mail@163.com
-  smtpPass: zhh666
+mysql:
+  default:
+    dialect: "mysql"
+    dbHost: "127.0.0.1"
+    dbPort: "3306"
+    dbName: "mall_db"
+    userName: "root"
+    password: "zhh2026"
+    charset: "utf8mb4"
+
+oss:
+  accessKeyId:
+  accessKeySecret:
+  bucketName:
+  qiNiuServer:
+
+# 国际化：defaultLang 未设置或未注册时回退 zh-CN（也可用 DEMO_LANG 环境变量）
+i18n:
+  defaultLang: "zh-CN"
+
+redis:
+  redisDbName: 4
+  redisHost: 127.0.0.1
+  redisPort: 6379
+  redisNetwork: "tcp"
+  redisPwd: ""

@@ -15,7 +15,6 @@ conf/config.ini
 # Dependency directories (remove the comment below to include it)
 # vendor/
 config/locales/config.yaml
-go.sum
 ci
 main
 logs
